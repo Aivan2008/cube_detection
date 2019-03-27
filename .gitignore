@@ -1,0 +1,6 @@
+*.hdf5
+*.h5
+*.pyc
+*.jpg
+*.bmp
+*.DS_Store
