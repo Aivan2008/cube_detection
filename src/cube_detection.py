@@ -10,6 +10,7 @@ import sys
 import getopt
 import rospkg
 import pickle
+import os
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 from object_detection_msgs.msg import DetectorResult as DRes
@@ -19,6 +20,7 @@ bridge = CvBridge()
 rospack = rospkg.RosPack()
 pub = rospy.Publisher('BBoxes', DRes, queue_size=20)
 cur_dir = rospack.get_path('cube_detection')
+
 #print cur_dir
 #image_pub = rospy.Publisher('Image_result', Image)
 #################################################
@@ -53,6 +55,7 @@ cfg = load_dict(CONFIG)
 squeeze=None
 sgd = None
 model = None
+image_index=0
 #################################################
 #   ___      __          __  _         
 #  / _ \___ / /____ ____/ /_(_)__  ___ 
@@ -74,7 +77,7 @@ def bbox_transform_single_box(bbox):
     return out_box
 
 def Callback(data):
-    global squeeze, sgd, model
+    global squeeze, sgd, model, image_index
     if squeeze==None:
         squeeze = SqueezeDet(cfg)
         # dummy optimizer for compilation
@@ -102,8 +105,6 @@ def Callback(data):
         cv2_img = bridge.imgmsg_to_cv2(data, "bgr8")
         orig_h =cv2_img.shape[0]
         orig_w =cv2_img.shape[1]
-        cv2.imshow("img", cv2_img)
-        cv2.waitKey(1)
     except CvBridgeError, e:
         print(e)
     else:
@@ -120,6 +121,15 @@ def Callback(data):
         all_filtered_boxes, all_filtered_classes, all_filtered_scores = filter_batch(y_pred, cfg)
 
         all_det_boxes = []
+        if not os.path.exists(cur_dir+"/images"):
+            os.makedirs(cur_dir+"/images")
+        if not os.path.exists(cur_dir+"/txt_files"):
+            os.makedirs(cur_dir+"/txt_files")
+        image_name = cur_dir+"/images/img_{0}.jpg".format(str(image_index).zfill(4))
+        txtfile_name = cur_dir+"/txt_files/img_{0}.txt".format(str(image_index).zfill(4))
+        cv2.imwrite(image_name, cv2_img)
+        txtfile = open(txtfile_name, 'w')
+        image_index+=1
         for j, det_box in enumerate(all_filtered_boxes[0]):
             # transform into xmin, ymin, xmax, ymax
             det_box = bbox_transform_single_box(det_box)
@@ -128,16 +138,22 @@ def Callback(data):
             det_box[0], det_box[2] = int(det_box[0] * x_scale), int(det_box[2] * x_scale)
             det_box[1], det_box[3] = int(det_box[1] * y_scale), int(det_box[3] * y_scale)
 
-
+            
+            
+            
+            txtfile.write("{0} {1} {2} {3} {4}\n".format(det_box[0], det_box[1], det_box[2], det_box[3], all_filtered_scores[0][j]))
             # possibly will be needed to gen out image
-            #cv2.rectangle(img, (det_box[0], det_box[1]), (det_box[2], det_box[3]), (255, 10, 10), 2)
+            cv2.rectangle(cv2_img, (det_box[0], det_box[1]), (det_box[2], det_box[3]), (255, 10, 10), 2)
             #cv2.putText(img, cfg.CLASS_NAMES[all_filtered_classes[i][j]] + " " + str(all_filtered_scores[i][j]),
             #            (det_box[0], det_box[1]), font, 1, (255, 10, 10), 2, cv2.LINE_AA)
+            
             det_box.append(all_filtered_scores[0][j])
             print(det_box)
             all_det_boxes.append(det_box)
 
-        
+        cv2.imshow("img", cv2_img)
+        cv2.waitKey(1)
+
         if len(all_det_boxes)>0:
             d_res = DRes()
             d_res.header.stamp = data.header.stamp
