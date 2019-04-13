@@ -17,6 +17,7 @@ from sensor_msgs.msg import Image
 from sensor_msgs.msg import CompressedImage
 from object_detection_msgs.msg import DetectorResult as DRes
 from object_detection_msgs.msg import DetectorBBox as DBox
+from nav_msgs.msg import Odometry
 import tf
 
 #################################################
@@ -38,7 +39,6 @@ from main.model.dataGenerator import generator_from_data_path, visualization_gen
 import keras.backend as K
 from keras import optimizers
 import numpy as np
-import argparse
 from keras.utils import multi_gpu_model
 from main.config.create_config import load_dict
 import cv2
@@ -86,12 +86,14 @@ def bbox_transform_single_box(bbox):
 
     return out_box
 def OdometryCallback(msg):
+    global odometry_pose, odom_mutex
     with odom_mutex:
-        euler = tf.transformations.euler_from_quaternion(msg.pose.orientation)
-        odometry_pose = [msg.pose.pose.x, msg.pose.pose.y, euler[2]]
+        orient = np.array([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
+        euler = tf.transformations.euler_from_quaternion(orient)
+        odometry_pose = [msg.pose.pose.position.x, msg.pose.pose.position.y, euler[2]]
         
 def Callback(data):
-    global squeeze, sgd, model, image_index, previous_bboxes
+    global squeeze, sgd, model, image_index, previous_bboxes, odometry_pose, odom_mutex
     if squeeze==None:
         squeeze = SqueezeDet(cfg)
         # dummy optimizer for compilation
@@ -191,7 +193,7 @@ def Callback(data):
         # Фильтрация детекций
         #Обычно самый маленький - самый классный
         #Берем обнаружение, считаем размер, считаем координаты
-        near_threshold_r2 = search_zone*search_zone #Радиус 8 пкс, в квадрате 64
+        near_threshold_r2 = 225 #Радиус 8 пкс, в квадрате 64
         positioned_boxes = []
         if len(all_det_boxes)>0:
             bbox = all_det_boxes[0]
@@ -214,7 +216,7 @@ def Callback(data):
                 dx = abs(bbox_x-curr_x)
                 dy = abs(curr_y-bbox_y)
                 r2 = dx*dx + dy*dy
-                print r2
+                #print r2
                 #Мы совпали, можно выбирать
                 if r2<near_threshold_r2:
                     new_box=False
@@ -233,7 +235,7 @@ def Callback(data):
         filt_det_bboxes = [x[1] for x in positioned_boxes]
                 
         #print "----", len(filt_det_bboxes), len(all_det_boxes), '-----'
-        p = []
+        #p = []
         with odom_mutex:
             p = odometry_pose
         if len(filt_det_bboxes)>0:
@@ -241,11 +243,11 @@ def Callback(data):
             d_res.header.stamp = data.header.stamp
             if len(p)==3:
                 d_res.x = p[0]
-                d_rex.y = p[1]
+                d_res.y = p[1]
                 d_res.angleZ = p[2]
             else:
                 d_res.x = 0
-                d_rex.y = 0
+                d_res.y = 0
                 d_res.angleZ = 0
             for bbox in filt_det_bboxes:
                 d_box = DBox()
@@ -285,9 +287,9 @@ def Detector(argv):
     video_src = '/usb_cam_front/image_raw/compressed'
     #print "Camera: ", video_src
     #else:
-    #    	video_src = argv[1]
+    #    	video_src = argv[1]OdometryCallback(msg):
     rospy.Subscriber(video_src, CompressedImage, Callback, queue_size=1, buff_size=2092800)
-
+    rospy.Subscriber("/kursant_driver/odom", Odometry, OdometryCallback, queue_size=1, buff_size=2092800)
     #cv2.namedWindow('img', cv2.WINDOW_NORMAL)
     #cv2.startWindowThread()
 
