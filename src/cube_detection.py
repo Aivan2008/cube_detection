@@ -188,8 +188,6 @@ def Callback(data):
         #cv2.imshow("img", cv2_img)
         #cv2.waitKey(1)
 
-        search_zone_perc = rospy.get_param("/cube_detector/double_area_size", 1.2)
-        search_zone = max(orig_w, orig_h)*search_zone_perc/2
         # Фильтрация детекций
         #Обычно самый маленький - самый классный
         #Берем обнаружение, считаем размер, считаем координаты
@@ -269,33 +267,11 @@ def Callback(data):
 #/_/|_|\____/___/ /_/  /_/\_,_/_/_//_/   /_/ /_//_/_/  \__/\_,_/\_,_/                                                                    
 #########################################################################
 def Detector(argv):
-    #print "Start "
     rospy.init_node('detector')
-    if not rospy.has_param('/cube_detector/trj_len'):
-        rospy.set_param('/cube_detector/trj_len', 2)
-
-    #Два размера куба от прошлого положения
-    if not rospy.has_param('/cube_detector/double_area_size'):
-        rospy.set_param('/cube_detector/double_area_size', 1.5)
-
-    #Два размера куба от прошлого положения
-    if not rospy.has_param('/cube_detector/search_area_size'):
-        rospy.set_param('/cube_detector/search_area_size', 2.0)
-    
-    #if len(argv) < 2:
-    #video_src = '/usb_cam_front/image_raw'
-    video_src = '/usb_cam_front/image_raw/compressed'
-    #print "Camera: ", video_src
-    #else:
-    #    	video_src = argv[1]OdometryCallback(msg):
-    rospy.Subscriber(video_src, CompressedImage, Callback, queue_size=1, buff_size=2092800)
+    rospy.Subscriber('/usb_cam_front/image_raw/compressed', CompressedImage, Callback, queue_size=1, buff_size=2092800)
     rospy.Subscriber("/kursant_driver/odom", Odometry, OdometryCallback, queue_size=1, buff_size=2092800)
-    #cv2.namedWindow('img', cv2.WINDOW_NORMAL)
-    #cv2.startWindowThread()
-
     rospy.spin()
-    
-    #cv2.destroyWindow('img')
+
 ###################################
 #   __  ___     _    
 #  /  |/  /__ _(_)__ 
