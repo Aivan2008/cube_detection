@@ -53,6 +53,8 @@ from main.model.evaluation import filter_batch
 #CONFIG        = cur_dir+'/data/'+"squeeze.config"
 wheights_path = cur_dir+'/data/'+"model.180-0.99.hdf5"
 CONFIG        = cur_dir+'/data/'+"squeeze_cube_640x480.config"
+#wheights_path = cur_dir+'/data/'+"weights.hdf5"
+#CONFIG        = cur_dir+'/data/'+"config.config"
 #################################################
 cfg = load_dict(CONFIG)
 #Required global vars to hold initialized everything
